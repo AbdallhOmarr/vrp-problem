@@ -322,7 +322,7 @@ class Dispatcher:
         total_distance = 0
         customer_served = []
         for route in solution:
-            if len(r.customers) == 1:
+            if len(route.customers) == 1:
                 pass
             else:
                 for customer in route.customers:
@@ -335,7 +335,7 @@ class Dispatcher:
             else:
                 return 0
 
-        customer_served_percentage = (len(customers_served)/100)*100
+        customer_served_percentage = (len(customer_served)/100)*100
 
         fitness_value = customer_served_percentage*1000-total_distance
 
