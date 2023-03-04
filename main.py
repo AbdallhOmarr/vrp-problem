@@ -200,8 +200,6 @@ class Dispatcher:
         for route in self.routes:
             if customer_num in route.customer_nums:
                 return route
-        print("customer is not in sol !! ")
-        print(f"customer:{customer_num}")
         return False
 
     def generate_initial_solution(self):
@@ -217,59 +215,40 @@ class Dispatcher:
             if i_route == j_route:
                 continue
 
-            print(
-                f"i:{i}, i_route:{i_route.customer_nums}, j:{j}, j_route:{j_route.customer_nums}")
-
             new_route = self.merge_routes(i_route, j_route, i, j)
-            print(f"new route customers: {new_route.customer_nums}")
             new_route.customers.sort(
                 key=lambda customer: customer.due_date)
             new_route.customer_nums = [
                 customer.cust_no for customer in new_route.customers]
-            print(f"new route customers sorted: {new_route.customer_nums}")
 
             # check capacity constrain
             if new_route.check_capacity():
-                print("checking capacity")
                 capacity_constrain = True
 
             if new_route.check_time_window():
-                print("checking time constrain")
                 time_constrain = True
             else:
-                print("time constrain failed ")
                 new_route = self.merge_routes(j_route, i_route, j, i)
                 if new_route.check_capacity():
-                    print("checking capacity after reversing route")
                     capacity_constrain = True
                 else:
                     capacity_constrain = False
 
                 if new_route.check_time_window():
-                    print("checking time constrain")
                     time_constrain = True
 
             if time_constrain and capacity_constrain:
                 merged = True
-                print("constrains are not violated")
-                print(f"i_route:{i_route.id}\nj_route:{j_route.id}")
-                print(
-                    f"new routes: before adding the merged route:{[route.id for route in self.routes]}")
-                print(f"i:{i}-j:{j}")
                 self.routes.append(new_route)
                 if i_route in self.routes:
                     self.routes.remove(i_route)
                 else:
-                    print(f"i_route is not in new routes!")
+                    pass
                 if j_route in self.routes:
                     self.routes.remove(j_route)
                 else:
-                    print(f"j route is not in routes")
+                    pass
 
-                print(
-                    f"new routes: after adding the merged route:{[route.id for route in self.routes]}")
-
-        print("done loops")
         # self.routes = new_routes.copy()
         self.update_total_solution_distance()
         self.best_solution = Solution(self.routes)
@@ -278,11 +257,9 @@ class Dispatcher:
 
     def generate_initial_population(self, POPULATION_SIZE):
         # Step 1: Generate initial population
-        print(f"routes:{self.routes}")
         self.population = []
         for i in range(POPULATION_SIZE):
             shuffled_routes = random.sample(self.routes, len(self.routes))
-            print(f"shuffiled_routes={shuffled_routes}")
             solution = Solution(shuffled_routes)
             solution.update_fitness()
 
@@ -291,11 +268,9 @@ class Dispatcher:
 
     def generate_population(self, POPULATION_SIZE, routes):
         # BEST Solution routes to get the new population
-        print(f"routes:{routes}")
         self.population = []
         for i in range(POPULATION_SIZE):
             shuffled_routes = random.sample(routes, len(routes))
-            print(f"shuffiled_routes={shuffled_routes}")
             solution = Solution(shuffled_routes)
             solution.update_fitness()
 
@@ -368,21 +343,16 @@ class Dispatcher:
         # each two parent will return a child with its next parent
         self.children = []
         for i, parent in enumerate(self.parents):
-            print(f"i:{i}")
             # this to break if its the last element in the lst
             if parent == self.parents[-1]:
                 break
             next_parent = self.parents[i+1]
-            print(
-                f"--------------\nparent:{parent}\nnext_parent:{next_parent}\n------------------")
             # now i have parent and next_parent
             # create a probability factor to choose randomly parts from parent 1 and parts from parent 2 in the new parent
 
             p_factor = random.randint(
                 1, min(len(parent.routes), len(next_parent.routes)))
             routes = parent.routes[:p_factor] + next_parent.routes[p_factor:]
-            print(f"routes:{routes}")
-            print("------------------------")
 
             new_routes = []
             for ix, route in enumerate(routes):
@@ -409,7 +379,6 @@ class Dispatcher:
     def insertion_mutation(self):
         for solution in self.children:
             for route in solution.routes:
-                print(f"route customers before:{route.customer_nums}")
                 # randomly select two positions in the solution
                 pos1 = random.randint(0, len(route.customers) - 1)
                 pos2 = random.randint(0, len(route.customers) - 1)
@@ -419,7 +388,6 @@ class Dispatcher:
                 gene = route.customer_nums.pop(pos1)
                 route.customer_nums.insert(pos2, gene)
 
-                print(f"route customers after:{route.customer_nums}")
                 route.update_load()
                 route.update_distance()
 
@@ -432,13 +400,13 @@ class Dispatcher:
 
         best_solutions = []
         for i in range(GENERATION_NUM):
+            print(f"generation:{i}")
             best_solution = self.best_solution
             best_solution_fitness = self.best_solution.fitness
             for j in range(POPULATION_SIZE):
                 self.rank_based_selection(PARENTS_SIZE)
                 self.cross_over_operator()
                 self.insertion_mutation()
-                print(f"children after finished {self.children}")
                 for sol in self.children:
                     if sol.fitness > best_solution_fitness:
                         best_solution = sol
@@ -449,8 +417,6 @@ class Dispatcher:
 
         ranked_solutions = sorted(
             best_solutions, key=lambda solution: solution.fitness)
-        print(f"ranked solution 0:{ranked_solutions[0].fitness}")
-        print(f"ranked solution -1:{ranked_solutions[-1].fitness}")
 
         self.best_solution_ever = ranked_solutions[-1]
         return self.best_solution_ever
@@ -488,10 +454,8 @@ class Solution:
         # it should check capacity, time constrains for the whole solutions:
         for route in self.routes:
             if route.check_time_window() and route.check_capacity():
-                print("route is feasible")
                 pass
             else:
-                print("route is not feasible")
                 self.fitness = 0
                 return self.fitness
         self.customers_served_percentage = self.get_percentage_of_customers_served()
@@ -530,8 +494,6 @@ class Solution:
             else:
                 for customer in r.customers:
                     customers_served.append(customer)
-        print(
-            f"len of customer served: {len(customers_served)}")
         return (len(customers_served)/100)*100
 
 
