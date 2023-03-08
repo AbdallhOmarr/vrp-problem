@@ -252,7 +252,6 @@ class Dispatcher:
         # self.routes = new_routes.copy()
         self.update_total_solution_distance()
         self.best_solution = Solution(self.routes)
-        self.best_solution.remove_duplicated()
         self.best_solution.update_distance()
         self.best_solution.update_fitness()
 
@@ -262,7 +261,6 @@ class Dispatcher:
         for i in range(POPULATION_SIZE):
             shuffled_routes = random.sample(self.routes, len(self.routes))
             solution = Solution(shuffled_routes)
-            solution.remove_duplicated()
             solution.update_distance()
             solution.update_fitness()
 
@@ -426,7 +424,6 @@ class Dispatcher:
                 self.cross_over_operator()
                 self.insertion_mutation()
                 for sol in self.children:
-                    sol.remove_duplicated()
                     sol.update_distance()
                     sol.update_fitness()
                     if sol.fitness == 0:
@@ -471,20 +468,21 @@ class Solution:
         self.fitness = self.update_fitness()
         self.customers_served_percentage = self.get_percentage_of_customers_served()
 
-    def remove_duplicated(self):
-
+    def remove_duplicates(self):
+        unique_customers = []
         for route in self.routes:
-            for cust in route.customers:
-                print(f"customer no.:{cust.cust_no}")
-                if cust.cust_no == 1:
-                    continue
-                for inner_route in self.routes:
-                    if inner_route == route:
-                        continue
-                    if cust in inner_route.customers:
-                        inner_route.customers.remove(cust)
+            new_customers = []
+            new_nums = []
+            for customer in route.customers:
+                if customer not in unique_customers:
+                    unique_customers.append(customer)
+                    new_customers.append(customer)
+                    new_nums.append(customer.cust_no)
 
-        self.update_fitness()
+            route.customers = new_customers
+            route.customer_nums = new_nums
+
+    #     self.update_fitness()
 
     def update_distance(self):
         self.total_distance = 0
@@ -496,7 +494,9 @@ class Solution:
         return self.total_distance
 
     def update_fitness(self):
+        self.remove_duplicated()
         self.update_distance()
+
         # it should return fitness_value
         # it should check capacity, time constrains for the whole solutions:
         for route in self.routes:
