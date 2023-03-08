@@ -252,6 +252,7 @@ class Dispatcher:
         # self.routes = new_routes.copy()
         self.update_total_solution_distance()
         self.best_solution = Solution(self.routes)
+        self.best_solution.remove_duplicated()
         self.best_solution.update_distance()
         self.best_solution.update_fitness()
 
@@ -261,6 +262,8 @@ class Dispatcher:
         for i in range(POPULATION_SIZE):
             shuffled_routes = random.sample(self.routes, len(self.routes))
             solution = Solution(shuffled_routes)
+            solution.remove_duplicated()
+            solution.update_distance()
             solution.update_fitness()
 
             self.population.append(solution)
@@ -357,7 +360,8 @@ class Dispatcher:
                 # create a probability factor to choose randomly parts from parent 1 and parts from parent 2 in the new parent
                 p_factor = random.randint(
                     1, min(len(parent.routes), len(next_parent.routes)))
-                routes = parent.routes[:p_factor] + next_parent.routes[p_factor:]
+                routes = parent.routes[:p_factor] + \
+                    next_parent.routes[p_factor:]
 
                 new_routes = []
                 for ix, route in enumerate(routes):
@@ -383,7 +387,7 @@ class Dispatcher:
                 # no crossover is done, add the parent to the children list
                 self.children.append(parent)
         return self.children
-        
+
     def insertion_mutation(self):
         for solution in self.children:
             # generate a random number between 0 and 1
@@ -407,23 +411,36 @@ class Dispatcher:
 
             solution.update_distance()
             solution.update_fitness()
+
     def apply_genetic_algorithm(self, GENERATION_NUM, POPULATION_SIZE, PARENTS_SIZE):
         # create initial population
         self.generate_initial_population(POPULATION_SIZE)
 
         best_solutions = []
+        best_solution = self.best_solution
+        best_solution_fitness = self.best_solution.fitness
         for i in range(GENERATION_NUM):
             print(f"generation:{i}")
-            best_solution = self.best_solution
-            best_solution_fitness = self.best_solution.fitness
             for j in range(POPULATION_SIZE):
                 self.rank_based_selection(PARENTS_SIZE)
                 self.cross_over_operator()
                 self.insertion_mutation()
                 for sol in self.children:
+                    sol.remove_duplicated()
+                    sol.update_distance()
+                    sol.update_fitness()
+                    if sol.fitness == 0:
+                        for ro in sol.routes:
+                            ro.order_customers_by_ready_time()
+                        sol.update_distance()
+                        sol.update_fitness()
+
+                    print(
+                        f"Solution: Distance:{sol.total_distance}, fitness:{sol.fitness}")
                     if sol.fitness > best_solution_fitness:
                         best_solution = sol
                         best_solution_fitness = sol.fitness
+                        sol.formulate_solution()
 
             self.generate_population(POPULATION_SIZE, best_solution.routes)
             best_solutions.append(best_solution)
@@ -432,6 +449,7 @@ class Dispatcher:
             best_solutions, key=lambda solution: solution.fitness)
 
         self.best_solution_ever = ranked_solutions[-1]
+
         return self.best_solution_ever
 
 
@@ -447,10 +465,26 @@ class Solution:
         for route in self.routes:
             self.customers.append(route.customers)
         self.total_distance = self.update_distance()
+
         self.update_distance()
 
         self.fitness = self.update_fitness()
         self.customers_served_percentage = self.get_percentage_of_customers_served()
+
+    def remove_duplicated(self):
+
+        for route in self.routes:
+            for cust in route.customers:
+                print(f"customer no.:{cust.cust_no}")
+                if cust.cust_no == 1:
+                    continue
+                for inner_route in self.routes:
+                    if inner_route == route:
+                        continue
+                    if cust in inner_route.customers:
+                        inner_route.customers.remove(cust)
+
+        self.update_fitness()
 
     def update_distance(self):
         self.total_distance = 0
@@ -608,6 +642,16 @@ class Route:
         for customer in self.customers:
             self.load += customer.demand
         return self.load
+
+    def order_customers_by_ready_time(self):
+        self.customers = sorted(
+            self.customers, key=lambda customer: customer.ready_time)
+        self.customer_nums = [cust.cust_no for cust in self.customers]
+
+    def order_customers_by_due_time(self):
+        self.customers = sorted(
+            self.customers, key=lambda customer: customer.due_date)
+        self.customer_nums = [cust.cust_no for cust in self.customers]
 
 
 class Customer:
