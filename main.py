@@ -348,36 +348,50 @@ class Dispatcher:
                 break
             next_parent = self.parents[i+1]
             # now i have parent and next_parent
-            # create a probability factor to choose randomly parts from parent 1 and parts from parent 2 in the new parent
 
-            p_factor = random.randint(
-                1, min(len(parent.routes), len(next_parent.routes)))
-            routes = parent.routes[:p_factor] + next_parent.routes[p_factor:]
+            # generate a random number between 0 and 1
+            prob = random.uniform(0, 1)
 
-            new_routes = []
-            for ix, route in enumerate(routes):
-                if route == routes[-1]:
-                    break
-
-                next_route = routes[ix+1]
-
+            # check if the probability is less than 0.8 (80%)
+            if prob < 0.8:
+                # create a probability factor to choose randomly parts from parent 1 and parts from parent 2 in the new parent
                 p_factor = random.randint(
-                    1, min(len(route.customers), len(next_route.customers)))
+                    1, min(len(parent.routes), len(next_parent.routes)))
+                routes = parent.routes[:p_factor] + next_parent.routes[p_factor:]
 
-                new_customers = route.customers[:p_factor] + \
-                    next_route.customers[p_factor:]
+                new_routes = []
+                for ix, route in enumerate(routes):
+                    if route == routes[-1]:
+                        break
 
-                new_route = self.create_route(new_customers)
-                new_routes.append(new_route)
-            if len(new_routes) == 0:
-                continue
-            child = Solution(new_routes)
-            child.update_fitness()
-            self.children.append(child)
+                    next_route = routes[ix+1]
+
+                    p_factor = random.randint(
+                        1, min(len(route.customers), len(next_route.customers)))
+
+                    new_customers = route.customers[:p_factor] + \
+                        next_route.customers[p_factor:]
+
+                    new_route = self.create_route(new_customers)
+                    new_routes.append(new_route)
+                if len(new_routes) == 0:
+                    continue
+                child = Solution(new_routes)
+                child.update_fitness()
+                self.children.append(child)
+            else:
+                # no crossover is done, add the parent to the children list
+                self.children.append(parent)
         return self.children
-
+        
     def insertion_mutation(self):
         for solution in self.children:
+            # generate a random number between 0 and 1
+            prob = random.uniform(0, 1)
+            # check if the probability is less than 0.2 (20%)
+            if prob >= 0.2:
+                continue
+
             for route in solution.routes:
                 # randomly select two positions in the solution
                 pos1 = random.randint(0, len(route.customers) - 1)
@@ -393,7 +407,6 @@ class Dispatcher:
 
             solution.update_distance()
             solution.update_fitness()
-
     def apply_genetic_algorithm(self, GENERATION_NUM, POPULATION_SIZE, PARENTS_SIZE):
         # create initial population
         self.generate_initial_population(POPULATION_SIZE)
