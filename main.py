@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 import math
 import numpy as np
 import random
+import pandas as pd
+from sklearn.cluster import KMeans
+import re
 
 
 def get_distance_between_two_points(x1, y1, x2, y2):
@@ -46,16 +49,29 @@ class Dispatcher:
 
         # Create pandas dataframe from list of dictionaries
         self.customers_df = pd.DataFrame(data)
+        # from customer df create cluster df
+        columns_to_cluster = ['XCOORD', 'YCOORD', 'DEMAND',
+                              'READY_TIME', 'DUE_DATE', 'SERVICE_TIME']
+
+        # Normalize the data
+        data_norm = (self.customers_df[columns_to_cluster] -
+                     self.customers_df[columns_to_cluster].mean()) / self.customers_df[columns_to_cluster].std()
+
+        # Apply k-means clustering with k=2
+        kmeans = KMeans(n_clusters=20, random_state=0).fit(data_norm)
+
+        self.customers_df['cluster'] = kmeans.labels_
 
     def create_customers(self):
         try:
             for i, v in self.customers_df.iterrows():
                 if i == 0:
                     self.DEPOT = Customer(v["CUST_NO"], v["XCOORD"], v["YCOORD"],
-                                          v["DEMAND"], v["READY_TIME"], v["DUE_DATE"], v["SERVICE_TIME"])
+                                          v["DEMAND"], v["READY_TIME"], v["DUE_DATE"], v["SERVICE_TIME"], v['cluster'])
+
                 else:
                     self.customers.append(Customer(
-                        v["CUST_NO"], v["XCOORD"], v["YCOORD"], v["DEMAND"], v["READY_TIME"], v["DUE_DATE"], v["SERVICE_TIME"]))
+                        v["CUST_NO"], v["XCOORD"], v["YCOORD"], v["DEMAND"], v["READY_TIME"], v["DUE_DATE"], v["SERVICE_TIME"], v['cluster']))
             return True
         except:
             return False
@@ -202,6 +218,28 @@ class Dispatcher:
                 return route
         return False
 
+    def generate_clustered_routes(self):
+        routes = []
+        for i in range(20):
+            routes.append(Route(i, self.customers[0]))
+
+        for cust in self.customers:
+            # create routes from 0 to 19
+            print(f"Customer:{cust.cust_no}, cluster: {cust.cluster}")
+            cluster = cust.cluster
+            routes[int(cluster)].add_customer(cust)
+
+        for route in routes:
+            print([c.cust_no for c in route.customers])
+            if len(route.customers) == 0:
+                routes.remove(route)
+
+        self.routes = routes
+        self.update_total_solution_distance()
+        self.best_solution = Solution(self.routes)
+        self.best_solution.update_distance()
+        self.best_solution.update_fitness()
+
     def generate_initial_solution(self):
         new_routes = self.routes.copy()
         self.calculate_savings()
@@ -261,7 +299,6 @@ class Dispatcher:
         for i in range(POPULATION_SIZE):
             shuffled_routes = random.sample(self.routes, len(self.routes))
             solution = Solution(shuffled_routes)
-            solution.update_distance()
             solution.update_fitness()
 
             self.population.append(solution)
@@ -340,7 +377,7 @@ class Dispatcher:
 
         return self.parents
 
-    def cross_over_operator(self):
+    def cross_over_operator(self, cross_over_rate):
         # each two parent will return a child with its next parent
         self.children = []
         for i, parent in enumerate(self.parents):
@@ -354,7 +391,7 @@ class Dispatcher:
             prob = random.uniform(0, 1)
 
             # check if the probability is less than 0.8 (80%)
-            if prob < 0.8:
+            if prob < cross_over_rate:
                 # create a probability factor to choose randomly parts from parent 1 and parts from parent 2 in the new parent
                 p_factor = random.randint(
                     1, min(len(parent.routes), len(next_parent.routes)))
@@ -386,12 +423,12 @@ class Dispatcher:
                 self.children.append(parent)
         return self.children
 
-    def insertion_mutation(self):
+    def insertion_mutation(self, mutation_rate):
         for solution in self.children:
             # generate a random number between 0 and 1
             prob = random.uniform(0, 1)
             # check if the probability is less than 0.2 (20%)
-            if prob >= 0.2:
+            if prob >= mutation_rate:
                 continue
 
             for route in solution.routes:
@@ -410,43 +447,33 @@ class Dispatcher:
             solution.update_distance()
             solution.update_fitness()
 
-    def apply_genetic_algorithm(self, GENERATION_NUM, POPULATION_SIZE, PARENTS_SIZE):
+    def apply_genetic_algorithm(self, GENERATION_NUM, POPULATION_SIZE, PARENTS_SIZE, cross_over_rate, mutation_rate):
         # create initial population
         self.generate_initial_population(POPULATION_SIZE)
-
-        best_solutions = []
         best_solution = self.best_solution
         best_solution_fitness = self.best_solution.fitness
+
+        best_solutions = []
+        best_solutions.append(best_solution)
+
         for i in range(GENERATION_NUM):
             print(f"generation:{i}")
             for j in range(POPULATION_SIZE):
                 self.rank_based_selection(PARENTS_SIZE)
-                self.cross_over_operator()
-                self.insertion_mutation()
+                self.cross_over_operator(cross_over_rate)
+                self.insertion_mutation(mutation_rate)
                 for sol in self.children:
-                    sol.update_distance()
-                    sol.update_fitness()
-                    if sol.fitness == 0:
-                        for ro in sol.routes:
-                            ro.order_customers_by_ready_time()
-                        sol.update_distance()
-                        sol.update_fitness()
-
-                    print(
-                        f"Solution: Distance:{sol.total_distance}, fitness:{sol.fitness}")
                     if sol.fitness > best_solution_fitness:
                         best_solution = sol
                         best_solution_fitness = sol.fitness
-                        sol.formulate_solution()
+                        best_solutions.append(best_solution)
 
             self.generate_population(POPULATION_SIZE, best_solution.routes)
-            best_solutions.append(best_solution)
 
         ranked_solutions = sorted(
             best_solutions, key=lambda solution: solution.fitness)
 
         self.best_solution_ever = ranked_solutions[-1]
-
         return self.best_solution_ever
 
 
@@ -462,27 +489,10 @@ class Solution:
         for route in self.routes:
             self.customers.append(route.customers)
         self.total_distance = self.update_distance()
-
         self.update_distance()
 
         self.fitness = self.update_fitness()
         self.customers_served_percentage = self.get_percentage_of_customers_served()
-
-    def remove_duplicates(self):
-        unique_customers = []
-        for route in self.routes:
-            new_customers = []
-            new_nums = []
-            for customer in route.customers:
-                if customer not in unique_customers:
-                    unique_customers.append(customer)
-                    new_customers.append(customer)
-                    new_nums.append(customer.cust_no)
-
-            route.customers = new_customers
-            route.customer_nums = new_nums
-
-    #     self.update_fitness()
 
     def update_distance(self):
         self.total_distance = 0
@@ -494,9 +504,7 @@ class Solution:
         return self.total_distance
 
     def update_fitness(self):
-        self.remove_duplicated()
         self.update_distance()
-
         # it should return fitness_value
         # it should check capacity, time constrains for the whole solutions:
         for route in self.routes:
@@ -602,33 +610,40 @@ class Route:
     def update_distance(self):
         # distance between customers + distance between boundary customers and DEPOT
         n = len(self.customers)
+
+        print(f"updating customers:{self.customers}")
+        print(f"length of customers:{n}")
         distances = []
-        for i, customer in enumerate(self.customers):
+        if n > 0:
+            for i, customer in enumerate(self.customers):
 
-            if i+1 >= n:
-                continue
+                if i+1 >= n:
+                    continue
 
-            next_customer = self.customers[i+1]
-            distance_between_cust_next_customer = get_distance_between_two_points(
-                customer.xcoord, customer.ycoord, next_customer.xcoord, next_customer.ycoord)
-            distances.append(distance_between_cust_next_customer)
+                next_customer = self.customers[i+1]
+                distance_between_cust_next_customer = get_distance_between_two_points(
+                    customer.xcoord, customer.ycoord, next_customer.xcoord, next_customer.ycoord)
+                distances.append(distance_between_cust_next_customer)
 
-        # distance between DEPOT and boundry customers
-        b1 = self.customers[0]
-        distance_between_b1_DEPOT = get_distance_between_two_points(
-            b1.xcoord, b1.ycoord, self.DEPOT.xcoord, self.DEPOT.ycoord)
-        distances.append(distance_between_b1_DEPOT)
+            # distance between DEPOT and boundry customers
+            b1 = self.customers[0]
+            distance_between_b1_DEPOT = get_distance_between_two_points(
+                b1.xcoord, b1.ycoord, self.DEPOT.xcoord, self.DEPOT.ycoord)
+            distances.append(distance_between_b1_DEPOT)
 
-        b2 = self.customers[-1]
-        distance_between_b2_DEPOT = get_distance_between_two_points(
-            b2.xcoord, b2.ycoord, self.DEPOT.xcoord, self.DEPOT.ycoord)
-        distances.append(distance_between_b2_DEPOT)
+            b2 = self.customers[-1]
+            distance_between_b2_DEPOT = get_distance_between_two_points(
+                b2.xcoord, b2.ycoord, self.DEPOT.xcoord, self.DEPOT.ycoord)
+            distances.append(distance_between_b2_DEPOT)
 
-        self.distance = 0
-        for distance in distances:
-            self.distance += distance
+            self.distance = 0
+            for distance in distances:
+                self.distance += distance
 
-        return self.distance
+            return self.distance
+        else:
+            self.distance = 0
+            return self.distance
 
     def check_capacity(self):
         self.update_load()
@@ -643,19 +658,9 @@ class Route:
             self.load += customer.demand
         return self.load
 
-    def order_customers_by_ready_time(self):
-        self.customers = sorted(
-            self.customers, key=lambda customer: customer.ready_time)
-        self.customer_nums = [cust.cust_no for cust in self.customers]
-
-    def order_customers_by_due_time(self):
-        self.customers = sorted(
-            self.customers, key=lambda customer: customer.due_date)
-        self.customer_nums = [cust.cust_no for cust in self.customers]
-
 
 class Customer:
-    def __init__(self, cust_no, xcoord, ycoord, demand, ready_time, due_date, service_time):
+    def __init__(self, cust_no, xcoord, ycoord, demand, ready_time, due_date, service_time, cluster):
         """ This class to create customers, store its data"""
         self.cust_no = int(cust_no)
         self.xcoord = xcoord
@@ -664,3 +669,4 @@ class Customer:
         self.ready_time = ready_time
         self.due_date = due_date
         self.service_time = service_time
+        self.cluster = cluster
