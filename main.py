@@ -225,12 +225,10 @@ class Dispatcher:
 
         for cust in self.customers:
             # create routes from 0 to 19
-            print(f"Customer:{cust.cust_no}, cluster: {cust.cluster}")
             cluster = cust.cluster
             routes[int(cluster)].add_customer(cust)
 
         for route in routes:
-            print([c.cust_no for c in route.customers])
             if len(route.customers) == 0:
                 routes.remove(route)
 
@@ -611,8 +609,6 @@ class Route:
         # distance between customers + distance between boundary customers and DEPOT
         n = len(self.customers)
 
-        print(f"updating customers:{self.customers}")
-        print(f"length of customers:{n}")
         distances = []
         if n > 0:
             for i, customer in enumerate(self.customers):
