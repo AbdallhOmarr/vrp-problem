@@ -50,15 +50,14 @@ class Dispatcher:
         # Create pandas dataframe from list of dictionaries
         self.customers_df = pd.DataFrame(data)
         # from customer df create cluster df
-        columns_to_cluster = ['XCOORD', 'YCOORD', 'DEMAND',
-                              'READY_TIME', 'DUE_DATE', 'SERVICE_TIME']
+        columns_to_cluster = ['XCOORD', 'YCOORD']
 
         # Normalize the data
         data_norm = (self.customers_df[columns_to_cluster] -
                      self.customers_df[columns_to_cluster].mean()) / self.customers_df[columns_to_cluster].std()
 
         # Apply k-means clustering with k=2
-        kmeans = KMeans(n_clusters=20, random_state=0).fit(data_norm)
+        kmeans = KMeans(n_clusters=40).fit(data_norm)
 
         self.customers_df['cluster'] = kmeans.labels_
 
@@ -220,7 +219,7 @@ class Dispatcher:
 
     def generate_clustered_routes(self):
         routes = []
-        for i in range(20):
+        for i in range(40):
             routes.append(Route(i, self.customers[0]))
 
         for cust in self.customers:
@@ -231,12 +230,15 @@ class Dispatcher:
         for route in routes:
             if len(route.customers) == 0:
                 routes.remove(route)
+        # for route in routes:
+        #     route.sort_customers()
 
         self.routes = routes
-        self.update_total_solution_distance()
-        self.best_solution = Solution(self.routes)
-        self.best_solution.update_distance()
-        self.best_solution.update_fitness()
+
+        # self.update_total_solution_distance()
+        # self.best_solution = Solution(self.routes)
+        # self.best_solution.update_distance()
+        # self.best_solution.update_fitness()
 
     def generate_initial_solution(self):
         new_routes = self.routes.copy()
@@ -348,7 +350,7 @@ class Dispatcher:
 
         customer_served_percentage = (len(customer_served)/100)*100
 
-        fitness_value = customer_served_percentage*1000-total_distance
+        fitness_value = customer_served_percentage*100000-total_distance
 
         return fitness_value
 
@@ -561,6 +563,15 @@ class Route:
         self.CAPACITY = 200  # constant
         self.load = 0
         self.DEPOT = DEPOT
+
+    def sort_customers(self):
+        """Sort the customers attribute of the route object by a given attribute and reconstruct customer_nums"""
+
+        print(f"customers before: {self.customer_nums}")
+        self.customers = sorted(
+            self.customers, key=lambda x:  x.due_date)
+        self.customer_nums = [c.cust_no for c in self.customers]
+        print(f"customers after: {self.customer_nums}")
 
     def __eq__(self, other):
         if isinstance(other, Route):
