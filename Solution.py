@@ -28,22 +28,24 @@ class Solution:
                     unique_customers.append(customer)
                     unique_customers_idx.append(route_idx)
                 else:
-                    duplicated_customers.append({"customer": customer, "route_idx": route_idx})
+                    duplicated_customers.append(route_idx)
 
-        for customer, route_idx in enumerate(duplicated_customers):
+        for route_idx in duplicated_customers:
             route = self.routes[route_idx]
             route_customers_array = route.customers_array
             rows_to_delete = []
             for i, row in enumerate(route_customers_array.copy()):
-                if customer == row[0]:
+                if row[0] in unique_customers:
+                    unique_customers.remove(row[0])
+                else:
                     rows_to_delete.append(i)
 
-                route_customers_array = np.delete(route_customers_array, rows_to_delete, axis=0)
-
+            route_customers_array = np.delete(route_customers_array, rows_to_delete, axis=0)
             self.routes[route_idx].customers_array = route_customers_array
             self.routes[route_idx].update_route_variables()
 
         self.update_variables()
+
                     
 
     def get_total_solution_distance(self):
@@ -70,7 +72,7 @@ class Solution:
     def get_total_customers_served(self):
         self.customers_served = []
         for route in self.routes:
-            self.customers_served =np.concatenate((self.customers_served, route.customers_ids))
+            self.customers_served =np.concatenate((self.customers_served, route.get_customers_ids()))
 
         self.total_customers_served = self.customers_served.shape[0]
         return self.total_customers_served 

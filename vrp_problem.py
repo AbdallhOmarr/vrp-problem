@@ -72,6 +72,7 @@ def add_distance_feature(customers_array, depot):
 
 
 def cluster_array(customers_array,  n_clusters):
+
     # extract columns to cluster from customers array
     columns_to_cluster = [4, 1, 2, 7]  # indices of DUE_DATE, XCOORD, YCOORD, and distance_FROM_DEPOT columns
     
@@ -104,19 +105,31 @@ def cluster_array(customers_array,  n_clusters):
 
 
 def get_routes(customers_array,n_clusters,DEPOT):
+
     routes =[]
     for n in range(n_clusters):
         route_customers = customers_array[customers_array[:, 8] == n]
+  
+        if route_customers.shape[0]==0:
+            print(f"n:{n}")
+            print("-"*50)
+            print(route_customers)
+            print("-"*50)
+            continue
+
         route = Route(route_customers,DEPOT)
         routes.append(route)
 
     return routes
 
 def generate_initial_population(customers_array,POPULATION_SIZE,n_cluster,DEPOT):
+
     population = []
     for i in range(POPULATION_SIZE):
         clustered_customers_array = cluster_array(customers_array,n_cluster)
         routes = get_routes(clustered_customers_array,n_cluster,DEPOT)
+
+        #error area
         sol = Solution(routes)
         sol.prevent_duplicated_customers()
         sol.update_variables()
@@ -153,9 +166,9 @@ def create_offspring(parent1,parent2,crossover_rate):
 
     offspring_routes = p1_routes[:crossover_point] + p2_routes[crossover_point:]
     offspring_sol = Solution(offspring_routes)
-    offspring_sol.prevent_duplicated_customers()
+    # offspring_sol.prevent_duplicated_customers()
     offspring_sol.update_variables()
-
+    return offspring_sol
 
 
 def main():
@@ -191,10 +204,10 @@ def main():
         offspring_fitness = offspring.fitness_func()
         print(f"offspring fitness:{offspring_fitness}")
         print("offspring solution:")
-        print(len(offspring.routes),offspring.total_distance,offspring.total_customers_served,offspring.check_feasiblity(),offspring.fitness_func())
+        print(len(offspring.routes),offspring.total_distance,offspring.get_total_customers_served(),offspring.check_feasiblity(),offspring.fitness_func())
         print("-"*50)
 
-        if offspring.get_total_number_of_served_customers()>100:
+        if offspring.get_total_customers_served()>100:
             break
 
         # Replace worst solution in population with offspring
@@ -214,6 +227,6 @@ def main():
         if best_sol.fitness_func() > best_sol_ever.fitness_func():
             best_sol_ever = best_sol
         print("best solution till now:")
-        print(len(best_sol_ever.routes),best_sol_ever.get_total_solution_distance(),best_sol_ever.get_total_number_of_served_customers(),best_sol_ever.check_feasiblity(),best_sol_ever.fitness_func())
+        print(len(best_sol_ever.routes),best_sol_ever.get_total_solution_distance(),best_sol_ever.get_total_customers_served(),best_sol_ever.check_feasiblity(),best_sol_ever.fitness_func())
         print("-"*50)
 

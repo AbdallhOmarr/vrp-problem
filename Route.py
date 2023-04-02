@@ -54,7 +54,10 @@ class Route:
 
 
     def get_route_distance(self):
-        
+        if self.customers_array.shape[0] == 0:
+            print("customers array is empty?!")
+            return 0
+            
         #i will get the distance between each customer and the next customer in the array
         #distance row[7]
         self.total_distance = 0 
@@ -72,7 +75,6 @@ class Route:
         self.total_distance += distance_1
         self.total_distance += distance_2 
         return self.total_distance
-
     def update_route_variables(self):
         self.get_load()
         self.get_customers_ids()
