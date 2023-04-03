@@ -22,27 +22,51 @@ class Solution:
         unique_customers = []
         unique_customers_idx = []
         duplicated_customers = []
+        duplicated_customers_route = []
         for route_idx, route in enumerate(self.routes):
+            print(f"customers:{route.get_customers_ids()}")
             for customer in route.get_customers_ids():
+
                 if customer not in unique_customers:
                     unique_customers.append(customer)
                     unique_customers_idx.append(route_idx)
                 else:
-                    duplicated_customers.append(route_idx)
+                    print(f"customer:{customer} duplicated!")
+                    duplicated_customers.append(customer)
+                    duplicated_customers_route.append(route_idx)
 
-        for route_idx in duplicated_customers:
+        for customer, route_idx in zip(duplicated_customers, duplicated_customers_route):
             route = self.routes[route_idx]
             route_customers_array = route.customers_array
             rows_to_delete = []
+            deleted = False  # flag variable to track whether a customer has been deleted from this route yet
             for i, row in enumerate(route_customers_array.copy()):
-                if row[0] in unique_customers:
-                    unique_customers.remove(row[0])
-                else:
+                if int(row[0]) == int(customer) and not deleted:
+                    print(f"customer:{customer}, row:{row[0]}")
                     rows_to_delete.append(i)
-
+                    deleted = True  # set flag to True after first deletion
             route_customers_array = np.delete(route_customers_array, rows_to_delete, axis=0)
             self.routes[route_idx].customers_array = route_customers_array
-            self.routes[route_idx].update_route_variables()
+
+        print("new customers:")
+
+        routes_to_delete = []
+        for route in self.routes:
+            print(f"new customers: {route.get_customers_ids()}")
+            if len(route.customers_ids) == 0:
+                routes_to_delete.append(route)
+
+        for route in routes_to_delete:
+            index = self.routes.index(route)  # find index of first occurrence
+            self.routes.pop(index)  # remove first occurrence using pop()
+
+        for route in self.routes:
+            print(f"new customers after deleting empty rows:{route.get_customers_ids()}")
+
+        for route in self.routes:
+            route.update_route_variables()
+
+
 
         self.update_variables()
 

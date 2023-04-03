@@ -72,9 +72,9 @@ def add_distance_feature(customers_array, depot):
 
 
 def cluster_array(customers_array,  n_clusters):
-
+    
     # extract columns to cluster from customers array
-    columns_to_cluster = [4, 1, 2, 7]  # indices of DUE_DATE, XCOORD, YCOORD, and distance_FROM_DEPOT columns
+    columns_to_cluster = [4, 1, 2, 7]  # indices of READY_TIME, XCOORD, YCOORD, and distance_FROM_DEPOT columns
     
     # normalize the data
     data_norm = (customers_array[:, columns_to_cluster] - customers_array[:, columns_to_cluster].mean(axis=0)) / customers_array[:, columns_to_cluster].std(axis=0)
@@ -131,7 +131,7 @@ def generate_initial_population(customers_array,POPULATION_SIZE,n_cluster,DEPOT)
 
         #error area
         sol = Solution(routes)
-        sol.prevent_duplicated_customers()
+        # sol.prevent_duplicated_customers()
         sol.update_variables()
         population.append(sol)
 
