@@ -24,14 +24,14 @@ class Solution:
         duplicated_customers = []
         duplicated_customers_route = []
         for route_idx, route in enumerate(self.routes):
-            print(f"customers:{route.get_customers_ids()}")
+            # print(f"customers:{route.get_customers_ids()}")
             for customer in route.get_customers_ids():
 
                 if customer not in unique_customers:
                     unique_customers.append(customer)
                     unique_customers_idx.append(route_idx)
                 else:
-                    print(f"customer:{customer} duplicated!")
+                    # print(f"customer:{customer} duplicated!")
                     duplicated_customers.append(customer)
                     duplicated_customers_route.append(route_idx)
 
@@ -42,41 +42,43 @@ class Solution:
             deleted = False  # flag variable to track whether a customer has been deleted from this route yet
             for i, row in enumerate(route_customers_array.copy()):
                 if int(row[0]) == int(customer) and not deleted:
-                    print(f"customer:{customer}, row:{row[0]}")
+                    # print(f"customer:{customer}, row:{row[0]}")
                     rows_to_delete.append(i)
                     deleted = True  # set flag to True after first deletion
             route_customers_array = np.delete(route_customers_array, rows_to_delete, axis=0)
             self.routes[route_idx].customers_array = route_customers_array
 
-        print("new customers:")
+        # print("new customers:")
 
         routes_to_delete = []
         for route in self.routes:
-            print(f"new customers: {route.get_customers_ids()}")
-            if len(route.customers_ids) == 0:
+            # print(f"new customers: {route.get_customers_ids()}")
+            if len(route.get_customers_ids()) == 0:
                 routes_to_delete.append(route)
 
         for route in routes_to_delete:
-            index = self.routes.index(route)  # find index of first occurrence
-            self.routes.pop(index)  # remove first occurrence using pop()
+            self.routes.remove(route)  # remove first occurrence using pop()
+
+        # for route in self.routes:
+        #     print(f"new customers after deleting empty rows:{route.get_customers_ids()}")
 
         for route in self.routes:
-            print(f"new customers after deleting empty rows:{route.get_customers_ids()}")
-
-        for route in self.routes:
+            route.get_customers_ids()
             route.update_route_variables()
 
 
 
-        self.update_variables()
+        # self.update_variables()
 
                     
 
     def get_total_solution_distance(self):
+
+        self.distances = []
         self.total_distance = 0
         for route in self.routes:
             self.total_distance +=route.get_route_distance()
-
+            self.distances.append(route.get_route_distance())
         return self.total_distance 
 
     def check_feasibility(self):
@@ -95,9 +97,10 @@ class Solution:
 
     def get_total_customers_served(self):
         self.customers_served = []
+        self.length_of_customers_array = []
         for route in self.routes:
             self.customers_served =np.concatenate((self.customers_served, route.get_customers_ids()))
-
+            self.length_of_customers_array.append(len(route.customers_ids))
         self.total_customers_served = self.customers_served.shape[0]
         return self.total_customers_served 
 
@@ -106,16 +109,28 @@ class Solution:
         return self.no_of_routes
 
     def fitness_func(self):
-        if self.fitness_value is not None:
-            return self.fitness_value
 
+        # if self.fitness_value is not None:
+        #     return self.fitness_value
         self.update_variables()
-        self.fitness_value = self.check_feasibility() * (self.total_customers_served*1000 - self.total_distance)
+
+        self.routes_fitness_value = 0
+        for route in self.routes:
+            self.routes_fitness_value+= route.route_fitness()
+
+        
+        feasibility = self.check_feasibility()
+        self.distances  = np.array(self.distances)
+        self.length_of_customers_array = np.array(self.length_of_customers_array)
+        # - self.total_distance/np.mean(self.distances) 
+        # /np.mean(self.length_of_customers_array)  + feasibility + self.routes_fitness_value 
+        self.fitness_value = self.total_customers_served - self.total_distance/100
         return self.fitness_value
 
 
 
     def update_variables(self):
+        self.prevent_duplicated_customers()
         self.get_total_solution_distance()
         self.check_feasibility()
         self.get_total_customers_served()

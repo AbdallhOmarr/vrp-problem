@@ -70,11 +70,10 @@ def add_distance_feature(customers_array, depot):
     
     return customers_array
 
-
-def cluster_array(customers_array,  n_clusters):
+def cluster_array(customers_array, n_clusters):
     
     # extract columns to cluster from customers array
-    columns_to_cluster = [4, 1, 2, 7]  # indices of READY_TIME, XCOORD, YCOORD, and distance_FROM_DEPOT columns
+    columns_to_cluster = [1,2,4]  # indices of READY_TIME, DUE_DATE, XCOORD, YCOORD, and distance_FROM_DEPOT columns
     
     # normalize the data
     data_norm = (customers_array[:, columns_to_cluster] - customers_array[:, columns_to_cluster].mean(axis=0)) / customers_array[:, columns_to_cluster].std(axis=0)
@@ -85,9 +84,15 @@ def cluster_array(customers_array,  n_clusters):
     # add cluster labels to customers array
     customers_array = np.column_stack((customers_array, kmeans.labels_))
     
-    # sort points by distance from depot within each cluster
-    sorted_indices = np.lexsort((customers_array[:, 7], customers_array[:, 5], customers_array[:, 8]))
+    # sort points by cluster and ready time
+    sorted_indices = np.lexsort((customers_array[:, 5], customers_array[:, 8]))
     customers_array = customers_array[sorted_indices, :]
+    
+    # # sort points by distance from depot within each cluster
+    # for i in range(n_clusters):
+    #     cluster_indices = np.where(customers_array[:, -1] == i)[0]
+    #     sorted_indices = np.argsort(customers_array[cluster_indices, 7])
+    #     customers_array[cluster_indices] = customers_array[cluster_indices][sorted_indices]
     
     return customers_array
 
@@ -166,7 +171,7 @@ def create_offspring(parent1,parent2,crossover_rate):
 
     offspring_routes = p1_routes[:crossover_point] + p2_routes[crossover_point:]
     offspring_sol = Solution(offspring_routes)
-    # offspring_sol.prevent_duplicated_customers()
+    offspring_sol.prevent_duplicated_customers()
     offspring_sol.update_variables()
     return offspring_sol
 
@@ -175,36 +180,39 @@ def main():
     customers_array,DEPOT = load_data()
     
     #customers_df = cluster_df(customers_df,20)
-    n_generation = 300
+    n_generation = 50
     n_population = 100 
-    co_rate = 0.8
-    m_rate = 0.3
+    co_rate = 0.5
+    m_rate = 0.5
     n_clusters = 20
     pop = generate_initial_population(customers_array, n_population,n_clusters,DEPOT)
     pop_fitness = [sol.fitness_func() for sol in pop]
 
     best_idx = pop_fitness.index(max(pop_fitness))
     best_sol_ever = pop[best_idx]
-
+    best_sol_ever_fitness = best_sol_ever.fitness_func()
     for g in range(n_generation):
         print(f"Genration:{g}")
-        pop = generate_initial_population(customers_array, n_population,n_clusters,DEPOT)
+        # pop = generate_initial_population(customers_array, n_population,n_clusters,DEPOT)
         print("Population created")
         parent1,parent2 = rank_based_selection(pop,2)
+        parent1.prevent_duplicated_customers()
+        parent2.prevent_duplicated_customers()
         print("Two parents created")
         offspring = create_offspring(parent1,parent2,co_rate)
+        offspring.prevent_duplicated_customers()
         print("an offspring created")
         # Mutate offspring
         for route in offspring.routes:
             route.mutate(m_rate)
         print(f"Route mutated")
 
-
+        offspring.prevent_duplicated_customers()
+        offspring.update_variables()
         # Calculate fitness for offspring
         offspring_fitness = offspring.fitness_func()
-        print(f"offspring fitness:{offspring_fitness}")
         print("offspring solution:")
-        print(len(offspring.routes),offspring.total_distance,offspring.get_total_customers_served(),offspring.check_feasiblity(),offspring.fitness_func())
+        print(len(offspring.routes),offspring.total_distance,offspring.get_total_customers_served(),offspring.check_feasibility(),offspring.fitness_func())
         print("-"*50)
 
         if offspring.get_total_customers_served()>100:
@@ -214,19 +222,24 @@ def main():
         pop_fitness = [sol.fitness_func() for sol in pop]
 
         worst_idx = pop_fitness.index(min(pop_fitness))
-        print(f"worest solution fitness:{pop_fitness[worst_idx]}")
-    
+        print(f"offspring fitness:{offspring_fitness} > worest solution fitness:{pop_fitness[worst_idx]}?")
 
         if offspring_fitness > pop_fitness[worst_idx]:
+            print("offspring fitness > worst sol fitness")
             pop[worst_idx] = offspring
+            pop_fitness[worst_idx] = offspring_fitness
 
-    
+        
         best_idx = pop_fitness.index(max(pop_fitness))
         best_sol = pop[best_idx]
+        best_sol_fitness = pop_fitness[best_idx]
 
-        if best_sol.fitness_func() > best_sol_ever.fitness_func():
+        if best_sol_fitness> best_sol_ever_fitness:
             best_sol_ever = best_sol
+            best_sol_ever_fitness = best_sol_fitness
+            
         print("best solution till now:")
-        print(len(best_sol_ever.routes),best_sol_ever.get_total_solution_distance(),best_sol_ever.get_total_customers_served(),best_sol_ever.check_feasiblity(),best_sol_ever.fitness_func())
+        print(len(best_sol_ever.routes),best_sol_ever.get_total_solution_distance(),best_sol_ever.get_total_customers_served(),best_sol_ever.check_feasibility(),best_sol_ever.fitness_func())
         print("-"*50)
+
 
